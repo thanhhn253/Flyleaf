@@ -76,7 +76,6 @@ unsafe partial class Player
         canPlay = Video.IsOpened || Audio.IsOpened;
         isLive  = MainDemuxer.IsLive;
         duration= MainDemuxer.Duration;
-        if (Video.isOpened) duration -= VideoDemuxer.VideoStream.FrameDuration;
 
         UIAdd(() =>
         {
@@ -92,7 +91,6 @@ unsafe partial class Player
         canPlay = Video.IsOpened || Audio.IsOpened;
         isLive  = MainDemuxer.IsLive;
         duration= MainDemuxer.Duration;
-        if (Video.isOpened) duration = Math.Max(0, duration - VideoDemuxer.VideoStream.FrameDuration);
 
         UIAdd(() =>
         {
@@ -734,7 +732,7 @@ unsafe partial class Player
             aFrame = null;
             isAudioSwitch = false;
             isVideoSwitch = false;
-            sFrame = null;
+            sFrame = sFramePrev = null;
             isSubsSwitch = false;
             dFrame = null;
             isDataSwitch = false;
@@ -747,6 +745,7 @@ unsafe partial class Player
             }
             else
             {
+                renderer?.ClearOverlayTexture();
                 Subtitles.subsText = "";
                 if (Subtitles._SubsText != "")
                     UI(() => Subtitles.SubsText = Subtitles.SubsText);
@@ -765,7 +764,8 @@ unsafe partial class Player
             {
                 isSubsSwitch = true;
                 decoder.SeekSubtitles();
-                sFrame = null;
+                renderer.ClearOverlayTexture();
+                sFrame = sFramePrev = null;
                 Subtitles.subsText = "";
                 if (Subtitles._SubsText != "")
                     UI(() => Subtitles.SubsText = Subtitles.SubsText);
@@ -867,6 +867,16 @@ unsafe partial class Player
     {
         lock (lockActions)
         {
+            if (url_iostream is string url_iostream_str)
+            {
+                // convert Windows lnk file to targetPath
+                if (Path.GetExtension(url_iostream_str).Equals(".lnk", StringComparison.OrdinalIgnoreCase))
+                {
+                    string targetPath = GetLnkTargetPath(url_iostream_str);
+                    url_iostream = targetPath;
+                }
+            }
+            
             if ((url_iostream is string) && ExtensionsSubtitles.Contains(GetUrlExtention(url_iostream.ToString())))
             {
                 OnOpening(new() { Url = url_iostream.ToString(), IsSubtitles = true});

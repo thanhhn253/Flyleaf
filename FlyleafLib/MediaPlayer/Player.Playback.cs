@@ -93,6 +93,7 @@ partial class Player
             {
                 VideoDecoder.DisposeFrame(vFrame);
                 vFrame = null;
+                sFrame = null;
                     
                 if (Status == Status.Stopped)
                     decoder?.Initialize();
@@ -251,6 +252,15 @@ partial class Player
                         UI(() => Status = Status);
                     }
 
+                    if (sFramePrev != null)
+                    {
+                        sFramePrev = null;
+                        renderer.ClearOverlayTexture();
+                        Subtitles.subsText = "";
+                        if (Subtitles._SubsText != "")
+                            UI(() => Subtitles.SubsText = Subtitles.SubsText);
+                    }
+
                     if (!Video.IsOpened)
                     {
                         if (AudioDecoder.OnVideoDemuxer)
@@ -330,7 +340,7 @@ partial class Player
         lock (lockActions)
         {
             Initialize();
-            renderer.Flush();
+            renderer?.Flush();
         }
     }
 }

@@ -102,6 +102,8 @@ public class FlyleafHost : ContentControl, IHostPlayer, IDisposable
 
     public event EventHandler SurfaceCreated;
     public event EventHandler OverlayCreated;
+    public event DragEventHandler OnSurfaceDrop;
+    public event DragEventHandler OnOverlayDrop;
 
     static bool isDesginMode;
     static int  idGenerator = 1;
@@ -811,6 +813,7 @@ public class FlyleafHost : ContentControl, IHostPlayer, IDisposable
 
         host.Player.Activity.Timeout = host.ActivityTimeout;
     }
+    bool setTemplate; // Issue #481 - FlyleafME override SetOverlay will not have a template to initialize properly *bool required if SetOverlay can be called multiple times and with different configs
     private static void OnOverlayTemplateChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
         if (isDesginMode)
@@ -820,9 +823,14 @@ public class FlyleafHost : ContentControl, IHostPlayer, IDisposable
         if (host.Disposed)
             return;
 
-        host.Overlay ??= new Window() { WindowStyle = WindowStyle.None, ResizeMode = ResizeMode.NoResize, AllowsTransparency = true };
-
-        host.Overlay.Template = host.OverlayTemplate;
+        if (host.Overlay == null)
+        {
+            host.setTemplate= true;
+            host.Overlay    = new Window() { WindowStyle = WindowStyle.None, ResizeMode = ResizeMode.NoResize, AllowsTransparency = true };
+            host.setTemplate= false;
+        }
+        else
+            host.Overlay.Template = host.OverlayTemplate;
     }
     private static void OnOverlayChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
@@ -1116,19 +1124,25 @@ public class FlyleafHost : ContentControl, IHostPlayer, IDisposable
         if (Player == null)
             return;
 
-        // Player Open File
-        if (e.Data.GetDataPresent(DataFormats.FileDrop))
-        {
-            string filename = ((string[])e.Data.GetData(DataFormats.FileDrop, false))[0];
-            Player.OpenAsync(filename);
-        }
+        // Invoke event first and see if it gets handled
+        OnSurfaceDrop?.Invoke(this, e);
 
-        // Player Open Text
-        else if (e.Data.GetDataPresent(DataFormats.Text))
+        if (!e.Handled)
         {
-            string text = e.Data.GetData(DataFormats.Text, false).ToString();
-            if (text.Length > 0)
-                Player.OpenAsync(text);
+            // Player Open File
+            if (e.Data.GetDataPresent(DataFormats.FileDrop))
+            {
+                string filename = ((string[])e.Data.GetData(DataFormats.FileDrop, false))[0];
+                Player.OpenAsync(filename);
+            }
+
+            // Player Open Text
+            else if (e.Data.GetDataPresent(DataFormats.Text))
+            {
+                string text = e.Data.GetData(DataFormats.Text, false).ToString();
+                if (text.Length > 0)
+                    Player.OpenAsync(text);
+            }
         }
 
         Surface.Activate();
@@ -1150,19 +1164,25 @@ public class FlyleafHost : ContentControl, IHostPlayer, IDisposable
         if (Player == null)
             return;
 
-        // Player Open File
-        if (e.Data.GetDataPresent(DataFormats.FileDrop))
-        {
-            string filename = ((string[])e.Data.GetData(DataFormats.FileDrop, false))[0];
-            Player.OpenAsync(filename);
-        }
+        // Invoke event first and see if it gets handled
+        OnOverlayDrop?.Invoke(this, e);
 
-        // Player Open Text
-        else if (e.Data.GetDataPresent(DataFormats.Text))
+        if (!e.Handled)
         {
-            string text = e.Data.GetData(DataFormats.Text, false).ToString();
-            if (text.Length > 0)
-                Player.OpenAsync(text);
+            // Player Open File
+            if (e.Data.GetDataPresent(DataFormats.FileDrop))
+            {
+                string filename = ((string[])e.Data.GetData(DataFormats.FileDrop, false))[0];
+                Player.OpenAsync(filename);
+            }
+
+            // Player Open Text
+            else if (e.Data.GetDataPresent(DataFormats.Text))
+            {
+                string text = e.Data.GetData(DataFormats.Text, false).ToString();
+                if (text.Length > 0)
+                    Player.OpenAsync(text);
+            }
         }
 
         Overlay.Activate();
@@ -1918,6 +1938,9 @@ public class FlyleafHost : ContentControl, IHostPlayer, IDisposable
         Overlay.AllowDrop =
             OpenOnDrop == AvailableWindows.Overlay || OpenOnDrop == AvailableWindows.Both ||
             SwapOnDrop == AvailableWindows.Overlay || SwapOnDrop == AvailableWindows.Both;
+
+        if (setTemplate)
+            Overlay.Template = OverlayTemplate;
 
         if (Surface.IsVisible)
             Overlay.Show();

@@ -50,6 +50,8 @@ public class Subtitles : NotifyPropertyChanged
         codec       = null;
         isOpened    = false;
         subsText    = "";
+        player.sFramePrev = null;
+        player.renderer?.ClearOverlayTexture();
 
         player.UIAdd(uiAction);
     }
@@ -59,6 +61,9 @@ public class Subtitles : NotifyPropertyChanged
 
         codec       = decoder.SubtitlesStream.Codec;
         isOpened    =!decoder.SubtitlesDecoder.Disposed;
+        subsText    = "";
+        player.sFramePrev = null;
+        player.renderer?.ClearOverlayTexture();
 
         player.UIAdd(uiAction);
     }
@@ -79,8 +84,6 @@ public class Subtitles : NotifyPropertyChanged
             return;
 
         decoder.CloseSubtitles();
-
-        player.sFrame = null;
         Reset();
         player.UIAll();
     }

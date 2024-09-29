@@ -558,8 +558,11 @@ public partial class DecoderContext
             foreach (var embStream in demuxer.AudioStreams)
                 embStream.ExternalStream = extStream;
             foreach (var embStream in demuxer.SubtitlesStreams)
+            {
                 embStream.ExternalStream = extStream;
-
+                embStream.ExternalStreamAdded(); // Copies VobSub's .idx file to extradata (based on external url .sub)
+            }
+            
             // Open embedded stream
             if (streamIndex != -2)
             {
@@ -769,7 +772,7 @@ public partial class DecoderContext
             error = Open(stream, defaultAudio).Error;
         else if (extStream != null)
             error = Open(extStream, defaultAudio).Error;
-        else if (defaultAudio)
+        else if (defaultAudio && Config.Audio.Enabled)
             error = OpenSuggestedAudio(); // We still need audio if no video exists
 
         return error;
@@ -861,7 +864,18 @@ public partial class DecoderContext
 
             // 4. Prevent Local/Online Search for 'small' duration videos
             if (VideoDemuxer.Duration < TimeSpan.FromMinutes(25).Ticks)
+            {
+                // 6. (Any) Check embedded/external streams for config languages (including 'undefined')
+                SuggestSubtitles(out var stream, out var extStream);
+
+                if (stream != null)
+                    Open(stream);
+                else if (extStream != null)
+                    Open(extStream);
+
                 return;
+            }
+                
 
         } catch (Exception e)
         {

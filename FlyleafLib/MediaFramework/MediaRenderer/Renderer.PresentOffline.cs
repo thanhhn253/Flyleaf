@@ -18,6 +18,17 @@ namespace FlyleafLib.MediaFramework.MediaRenderer;
 
 public partial class Renderer
 {
+    // subs
+    Texture2DDescription                    overlayTextureDesc;
+    ID3D11Texture2D                         overlayTexture;
+    ID3D11ShaderResourceView                overlayTextureSrv;
+    int                                     overlayTextureOriginalWidth;
+    int                                     overlayTextureOriginalHeight;
+    int                                     overlayTextureOriginalPosX;
+    int                                     overlayTextureOriginalPosY;
+    
+    ID3D11ShaderResourceView[]              overlayTextureSRVs = new ID3D11ShaderResourceView[1];
+
     // Used for off screen rendering
     Texture2DDescription                    singleStageDesc, singleGpuDesc;
     ID3D11Texture2D                         singleStage;
@@ -34,7 +45,8 @@ public partial class Renderer
     {
         if (videoProcessor == VideoProcessors.D3D11)
         {
-            vd1.CreateVideoProcessorOutputView(rtv.Resource, vpe, vpovd, out var vpov);
+            var tmpResource = rtv.Resource;
+            vd1.CreateVideoProcessorOutputView(tmpResource, vpe, vpovd, out var vpov);
 
             RawRect rect = new((int)viewport.X, (int)viewport.Y, (int)(viewport.Width + viewport.X), (int)(viewport.Height + viewport.Y));
             vc.VideoProcessorSetStreamSourceRect(vp, 0, true, VideoRect);
@@ -56,6 +68,7 @@ public partial class Renderer
             vc.VideoProcessorBlt(vp, vpov, 0, 1, vpsa);
             vpiv.Dispose();
             vpov.Dispose();
+            tmpResource.Dispose();
         }
         else
         {

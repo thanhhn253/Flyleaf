@@ -498,6 +498,20 @@ public unsafe class Demuxer : RunThreadBase
             // Find Streams Info
             if (Config.AllowFindStreamInfo)
             {
+                // TBR: Tested and even if it requires more analyze duration it does not actually use it
+                bool requiresMoreAnalyse = false;
+                for (int i = 0; i < fmtCtx->nb_streams; i++)
+                    if (fmtCtx->streams[i]->codecpar->codec_id == AVCodecID.AV_CODEC_ID_HDMV_PGS_SUBTITLE || 
+                        fmtCtx->streams[i]->codecpar->codec_id == AVCodecID.AV_CODEC_ID_DVD_SUBTITLE
+                        )
+                        { requiresMoreAnalyse = true; break; }
+
+                if (requiresMoreAnalyse)
+                {
+                    fmtCtx->probesize = Math.Max(fmtCtx->probesize, 5000 * (long)1024 * 1024); // Bytes
+                    fmtCtx->max_analyze_duration = Math.Max(fmtCtx->max_analyze_duration, 1000 * (long)1000 * 1000); // Mcs
+                }
+                
                 ret = avformat_find_stream_info(fmtCtx, null);
                 if (ret == AVERROR_EXIT || Status != Status.Opening || Interrupter.ForceInterrupt == 1) return error = "Cancelled";
                 if (ret < 0) return error = $"[avformat_find_stream_info] {FFmpegEngine.ErrorCodeToMsg(ret)} ({ret})";
@@ -551,7 +565,7 @@ public unsafe class Demuxer : RunThreadBase
             int queryStarts = url.IndexOf('?');
             if (queryStarts != -1)
             {
-                string query = Url[(queryStarts + 1)..];
+                string query = url[(queryStarts + 1)..];
                 var qp = HttpUtility.ParseQueryString(query);
                 url = url[..queryStarts] + "?";
 
@@ -634,6 +648,9 @@ public unsafe class Demuxer : RunThreadBase
             //UpdateHLSTime(); Maybe with default 0 playlist
         }
 
+        if (fmtCtx->nb_streams == 1 && fmtCtx->streams[0]->codecpar->codec_type == AVMEDIA_TYPE_SUBTITLE) // External Streams (mainly for .sub will have as start time the first subs timestamp)
+            StartTime = 0;
+
         IsLive = Duration == 0 || hlsCtx != null;
 
         bool hasVideo = false;
@@ -700,7 +717,8 @@ public unsafe class Demuxer : RunThreadBase
                         if ((fmtCtx->streams[i]->disposition & AV_DISPOSITION_ATTACHED_PIC) != 0) 
                             { Log.Info($"Excluding image stream #{i}"); continue; }
 
-                        if (((AVPixelFormat)fmtCtx->streams[i]->codecpar->format) == AVPixelFormat.AV_PIX_FMT_NONE)
+                        // TBR: When AllowFindStreamInfo = false we can get valid pixel format during decoding (in case of remuxing only this might crash, possible check if usedecoders?)
+                        if (((AVPixelFormat)fmtCtx->streams[i]->codecpar->format) == AVPixelFormat.AV_PIX_FMT_NONE && Config.AllowFindStreamInfo)
                         {
                             Log.Info($"Excluding invalid video stream #{i}");
                             continue;
@@ -715,7 +733,6 @@ public unsafe class Demuxer : RunThreadBase
                         SubtitlesStreams.Add(new SubtitlesStream(this, fmtCtx->streams[i]));
                         AVStreamToStream.Add(fmtCtx->streams[i]->index, SubtitlesStreams[^1]);
                         subsHasEng = SubtitlesStreams[^1].Language == Language.English;
-                        
                         break;
 
                     case AVMEDIA_TYPE_DATA:
